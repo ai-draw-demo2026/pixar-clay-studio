@@ -246,6 +246,24 @@ input[type="file"] { display: none; }
   box-shadow: 0 4px 24px rgba(0,0,0,.4);
 }
 #result .info { margin-top: 8px; font-size: 13px; color: #71717a; text-align: center; }
+#result-actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; justify-content: center; }
+#result-actions a, #result-actions button {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 10px 20px; border-radius: 10px;
+  font-size: 14px; font-weight: 600; cursor: pointer;
+  text-decoration: none; border: none; font-family: inherit;
+  transition: transform .2s, box-shadow .2s;
+}
+.btn-download {
+  background: linear-gradient(135deg, #ff9500, #ff6b35);
+  color: #fff; box-shadow: 0 4px 16px rgba(255,149,0,0.25);
+}
+.btn-download:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(255,149,0,0.35); }
+.btn-retry {
+  background: rgba(255,255,255,0.05); color: #e4e4e7;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+.btn-retry:hover { background: rgba(255,255,255,0.1); }
 
 /* ===== Footer ===== */
 .footer {
@@ -477,7 +495,7 @@ input[type="file"] { display: none; }
       <label for="negPrompt">反向屏蔽词（Negative Prompt）</label>
       <input type="text" id="negPrompt"
              placeholder="多余人物、新增人物、位置偏移、背景重构、畸形五官、画面变形、手指粘连"
-             value="多余人物、新增人物、人物位置偏移、背景重构、畸形五官、画面变形、手指粘连、多根手指、缺失手指、扭曲手掌">
+             value="多余人物、新增人物、人物位置偏移、背景重构、畸形五官、画面变形、手指粘连、手指粗细不均、多根手指、缺失手指、扭曲手掌、手指弯曲异常、手指交缠融合、手部轮廓模糊、畸形手部、手指重叠、错误手部透视">
     </div>
 
     <!-- Generate -->
@@ -490,6 +508,10 @@ input[type="file"] { display: none; }
     <div id="result">
       <img id="resultImg" alt="生成结果">
       <div class="info" id="resultInfo"></div>
+      <div id="result-actions">
+        <a class="btn-download" id="downloadBtn" download="pixar-clay.png">⬇ 下载</a>
+        <button class="btn-retry" id="retryBtn">🔄 调整参数再生成</button>
+      </div>
     </div>
   </div>
 </section>
@@ -651,6 +673,14 @@ generateBtn.addEventListener("click", async () => {
         const cost = resultJson.meta?.pointsCost;
         const bal = resultJson.meta?.accountBalance;
         resultInfo.textContent = `消耗积分: ${cost ?? "?"} | 剩余积分: ${bal ?? "?"}`;
+        // 下载按钮
+        document.getElementById("downloadBtn").href = resultImg.src;
+        document.getElementById("downloadBtn").download = "pixar-clay-" + taskId + ".png";
+        // 再生成按钮：用原参数重新提交
+        document.getElementById("retryBtn").onclick = () => {
+          resultEl.classList.remove("show");
+          generateBtn.click();
+        };
         setStatus("生成成功!", "success");
         setLoading(false, "🎨 生成黏土人偶");
         return;
