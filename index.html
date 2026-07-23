@@ -612,7 +612,9 @@ generateBtn.addEventListener("click", async () => {
   }
 
   try {
-    const baseUrl = (location.protocol === "file:") ? "http://127.0.0.1:3001" : "";
+    const BACKEND_URL = "https://pixar-clay.loca.lt";
+    const baseUrl = (location.hostname === "127.0.0.1" || location.hostname === "localhost")
+      ? "" : BACKEND_URL;
 
     const submitResp = await fetch(baseUrl + "/api/generate", {
       method: "POST",
@@ -644,6 +646,7 @@ generateBtn.addEventListener("click", async () => {
 
       if (resultJson.status === "done") {
         resultImg.src = baseUrl + "/api/image/" + taskId;
+        resultImg.crossOrigin = "anonymous";
         resultEl.classList.add("show");
         const cost = resultJson.meta?.pointsCost;
         const bal = resultJson.meta?.accountBalance;
@@ -674,7 +677,9 @@ generateBtn.addEventListener("click", async () => {
   const galleryGrid = document.getElementById("galleryGrid");
   const galleryEmpty = document.getElementById("galleryEmpty");
   try {
-    const baseUrl = (location.protocol === "file:") ? "http://127.0.0.1:3001" : "";
+    const BACKEND_URL = "https://pixar-clay.loca.lt";
+    const baseUrl = (location.hostname === "127.0.0.1" || location.hostname === "localhost")
+      ? "" : BACKEND_URL;
     const resp = await fetch(baseUrl + "/api/gallery");
     if (!resp.ok) throw new Error("HTTP " + resp.status);
     const items = await resp.json();
@@ -684,7 +689,7 @@ generateBtn.addEventListener("click", async () => {
     items.forEach(item => {
       const div = document.createElement("div");
       div.className = "gallery-item";
-      div.innerHTML = '<img src="' + baseUrl + item.imageUrl + '" alt="生成作品" loading="lazy">' +
+      div.innerHTML = '<img src="' + baseUrl + item.imageUrl + '" alt="生成作品" loading="lazy" crossorigin="anonymous">' +
         '<div class="overlay">' +
           (item.prompt ? item.prompt.slice(0, 30) + (item.prompt.length > 30 ? "…" : "") : "") +
           ' · ' + new Date(item.createdAt).toLocaleDateString("zh-CN") +
