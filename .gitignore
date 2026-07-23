@@ -1,0 +1,8 @@
+.env
+node_modules/
+gallery.json
+logs/
+*.cert
+*.key
+start.sh
+ecosystem.config.js

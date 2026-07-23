@@ -1,0 +1,700 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Pixar Clay Studio — AI 皮克斯黏土人偶生成器</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,500;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet">
+<style>
+/* ===== Reset & Base ===== */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Inter', -apple-system, 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  background: #0a0a0f;
+  color: #e4e4e7;
+  line-height: 1.6;
+  overflow-x: hidden;
+}
+
+/* ===== Navbar ===== */
+.navbar {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 1000;
+  background: rgba(10,10,15,0.8); backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  padding: 0 24px; height: 64px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.navbar .logo {
+  font-size: 20px; font-weight: 800;
+  background: linear-gradient(135deg, #ff9500, #ff6b35);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.navbar .logo-sub { font-size: 12px; color: #71717a; margin-left: 8px; font-weight: 400; -webkit-text-fill-color: #71717a; }
+.nav-links { display: flex; gap: 24px; align-items: center; }
+.nav-links a { color: #a1a1aa; text-decoration: none; font-size: 14px; font-weight: 500; transition: color .2s; }
+.nav-links a:hover { color: #fff; }
+.nav-cta {
+  background: linear-gradient(135deg, #ff9500, #ff6b35);
+  color: #fff !important; padding: 8px 20px; border-radius: 8px;
+  font-weight: 600 !important;
+}
+.nav-cta:hover { opacity: 0.9; }
+
+/* ===== Hero ===== */
+.hero {
+  min-height: 100vh; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  text-align: center; padding: 120px 24px 80px;
+  position: relative; overflow: hidden;
+}
+.hero-bg {
+  position: absolute; inset: 0; z-index: -1;
+  background: radial-gradient(ellipse at 50% 0%, rgba(255,149,0,0.12) 0%, transparent 60%),
+              radial-gradient(ellipse at 80% 50%, rgba(255,107,53,0.08) 0%, transparent 50%),
+              radial-gradient(ellipse at 20% 80%, rgba(255,149,0,0.05) 0%, transparent 40%);
+}
+.hero-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  background: rgba(255,149,0,0.1); border: 1px solid rgba(255,149,0,0.2);
+  color: #ff9500; padding: 6px 16px; border-radius: 100px;
+  font-size: 13px; font-weight: 600; margin-bottom: 24px;
+}
+.hero h1 {
+  font-size: clamp(40px, 8vw, 72px); font-weight: 800; line-height: 1.1;
+  background: linear-gradient(135deg, #fff 30%, #a1a1aa);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text; margin-bottom: 20px;
+}
+.hero h1 .highlight {
+  background: linear-gradient(135deg, #ff9500, #ff6b35);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.hero p {
+  font-size: clamp(16px, 2.5vw, 20px); color: #a1a1aa; max-width: 600px;
+  margin-bottom: 40px; line-height: 1.7;
+}
+.hero-actions { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; }
+.btn-primary {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: linear-gradient(135deg, #ff9500, #ff6b35);
+  color: #fff; padding: 14px 32px; border-radius: 12px;
+  font-size: 16px; font-weight: 600; text-decoration: none;
+  transition: transform .2s, box-shadow .2s;
+  box-shadow: 0 4px 24px rgba(255,149,0,0.3);
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 32px rgba(255,149,0,0.4); }
+.btn-secondary {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(255,255,255,0.05); color: #e4e4e7;
+  padding: 14px 32px; border-radius: 12px;
+  font-size: 16px; font-weight: 600; text-decoration: none;
+  border: 1px solid rgba(255,255,255,0.1);
+  transition: background .2s, border-color .2s;
+}
+.btn-secondary:hover { background: rgba(255,255,255,0.1); border-color: rgba(255,255,255,0.2); }
+
+/* ===== Hero showcase ===== */
+.hero-showcase {
+  margin-top: 60px; display: flex; gap: 16px; flex-wrap: wrap; justify-content: center;
+  max-width: 900px;
+}
+.hero-showcase .card {
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 16px; padding: 24px 28px; width: 200px;
+  text-align: center; backdrop-filter: blur(10px);
+}
+.hero-showcase .card .icon { font-size: 32px; margin-bottom: 8px; }
+.hero-showcase .card .label { font-size: 14px; font-weight: 600; color: #e4e4e7; margin-bottom: 4px; }
+.hero-showcase .card .desc { font-size: 12px; color: #71717a; }
+
+/* ===== Sections ===== */
+.section {
+  padding: 100px 24px;
+  max-width: 1200px; margin: 0 auto;
+}
+.section-header { text-align: center; margin-bottom: 60px; }
+.section-header h2 {
+  font-size: clamp(28px, 4vw, 40px); font-weight: 700; margin-bottom: 16px;
+  background: linear-gradient(135deg, #fff, #a1a1aa);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.section-header p { color: #71717a; font-size: 16px; max-width: 500px; margin: 0 auto; }
+
+/* ===== Features ===== */
+.features-grid {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px;
+}
+.feature-card {
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 20px; padding: 32px; transition: transform .2s, border-color .2s;
+}
+.feature-card:hover { transform: translateY(-4px); border-color: rgba(255,149,0,0.2); }
+.feature-card .icon { font-size: 36px; margin-bottom: 16px; }
+.feature-card h3 { font-size: 18px; font-weight: 600; margin-bottom: 8px; color: #fff; }
+.feature-card p { font-size: 14px; color: #71717a; line-height: 1.7; }
+
+/* ===== How it works ===== */
+.steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 32px; counter-reset: step; }
+.step { text-align: center; position: relative; }
+.step::before {
+  counter-increment: step; content: "0" counter(step);
+  display: block; font-size: 48px; font-weight: 800; margin-bottom: 12px;
+  background: linear-gradient(135deg, rgba(255,149,0,0.2), rgba(255,107,53,0.2));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.step h3 { font-size: 18px; font-weight: 600; margin-bottom: 8px; color: #fff; }
+.step p { font-size: 14px; color: #71717a; line-height: 1.7; }
+
+/* ===== Generator Section (dark container for the app) ===== */
+#generator-section {
+  scroll-margin-top: 80px;
+}
+.generator-container {
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 24px; padding: 40px; max-width: 720px; margin: 0 auto;
+  backdrop-filter: blur(10px);
+}
+.generator-container h2 { text-align: center; margin-bottom: 8px; -webkit-text-fill-color: #fff; }
+.generator-container .subtitle { text-align: center; font-size: 14px; color: #71717a; margin-bottom: 32px; }
+
+/* form elements */
+.form-group { margin-bottom: 20px; }
+.form-group label { font-weight: 600; font-size: 14px; display: block; margin-bottom: 6px; color: #d4d4d8; }
+.form-group select, .form-group textarea, .form-group input[type="text"] {
+  width: 100%; padding: 10px 14px;
+  background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 10px; font-size: 14px; color: #e4e4e7; font-family: inherit;
+  transition: border-color .2s;
+}
+.form-group select:focus, .form-group textarea:focus, .form-group input[type="text"]:focus {
+  outline: none; border-color: #ff9500; box-shadow: 0 0 0 3px rgba(255,149,0,0.1);
+}
+.form-group textarea { min-height: 72px; resize: vertical; }
+.form-group select option { background: #1a1a2e; color: #e4e4e7; }
+
+/* Upload areas */
+.upload-area {
+  border: 2px dashed rgba(255,255,255,0.1); border-radius: 14px;
+  padding: 28px 16px; text-align: center; cursor: pointer;
+  transition: border-color .2s, background .2s; margin-bottom: 16px;
+  background: rgba(255,255,255,0.02);
+}
+.upload-area:hover { border-color: #ff9500; background: rgba(255,149,0,0.05); }
+.upload-area.dragover { border-color: #ff9500; background: rgba(255,149,0,0.08); }
+.upload-area img { max-width: 100%; max-height: 240px; border-radius: 10px; display: block; margin: 0 auto; }
+.upload-icon { font-size: 36px; margin-bottom: 8px; }
+.upload-text { color: #a1a1aa; font-size: 14px; }
+.upload-text strong { color: #ff9500; }
+input[type="file"] { display: none; }
+
+/* Slider */
+.slider-group { margin-bottom: 20px; }
+.slider-group label { font-weight: 600; font-size: 14px; display: block; margin-bottom: 6px; color: #d4d4d8; }
+.slider-row { display: flex; align-items: center; gap: 12px; }
+.slider-row input[type="range"] { flex: 1; accent-color: #ff9500; height: 6px; }
+.slider-row .val-badge {
+  min-width: 48px; text-align: center; font-weight: 700; font-size: 14px;
+  color: #ff9500; background: rgba(255,149,0,0.1); border-radius: 6px; padding: 2px 10px;
+}
+.slider-hint { font-size: 12px; color: #71717a; margin-top: 4px; }
+
+/* Checkboxes */
+.checkbox-row {
+  margin-bottom: 20px; display: flex; flex-wrap: wrap; gap: 12px;
+}
+.checkbox-row label {
+  display: flex; align-items: center; gap: 8px;
+  font-weight: 500; font-size: 13px; cursor: pointer;
+  padding: 8px 14px; border-radius: 10px;
+  background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06);
+  transition: background .2s, border-color .2s;
+  color: #d4d4d8;
+}
+.checkbox-row label:hover { border-color: rgba(255,149,0,0.2); }
+.checkbox-row input[type="checkbox"] { width: 16px; height: 16px; accent-color: #ff9500; }
+.checkbox-row label span { font-weight: 400; color: #71717a; font-size: 11px; }
+
+/* Generate button */
+.btn-generate {
+  display: block; width: 100%; padding: 14px;
+  background: linear-gradient(135deg, #ff9500, #ff6b35);
+  border: none; border-radius: 12px; color: #fff;
+  font-size: 16px; font-weight: 600; cursor: pointer;
+  transition: transform .2s, box-shadow .2s;
+  box-shadow: 0 4px 16px rgba(255,149,0,0.25);
+}
+.btn-generate:hover { transform: translateY(-1px); box-shadow: 0 6px 24px rgba(255,149,0,0.35); }
+.btn-generate:disabled { background: #27272a; box-shadow: none; transform: none; cursor: not-allowed; }
+
+/* Status & Result */
+#status {
+  margin-top: 16px; padding: 10px 16px; border-radius: 10px; font-size: 14px; display: none;
+}
+#status.loading { display: block; background: rgba(255,149,0,0.1); color: #ff9500; }
+#status.error { display: block; background: rgba(239,68,68,0.1); color: #ef4444; }
+#status.success { display: block; background: rgba(34,197,94,0.1); color: #22c55e; }
+
+#result { margin-top: 20px; display: none; }
+#result.show { display: block; }
+#result img {
+  width: 100%; border-radius: 14px;
+  box-shadow: 0 4px 24px rgba(0,0,0,.4);
+}
+#result .info { margin-top: 8px; font-size: 13px; color: #71717a; text-align: center; }
+
+/* ===== Footer ===== */
+.footer {
+  text-align: center; padding: 40px 24px; border-top: 1px solid rgba(255,255,255,0.06);
+  color: #71717a; font-size: 14px;
+}
+.footer a { color: #ff9500; text-decoration: none; }
+.footer a:hover { text-decoration: underline; }
+
+/* ===== Gallery Grid ===== */
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  max-width: 900px;
+  margin: 0 auto;
+}
+.gallery-item {
+  position: relative;
+  border-radius: 14px;
+  overflow: hidden;
+  aspect-ratio: 3 / 4;
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  transition: transform .2s, border-color .2s;
+  cursor: pointer;
+}
+.gallery-item:hover { transform: translateY(-4px); border-color: rgba(255,149,0,0.3); }
+.gallery-item img {
+  width: 100%; height: 100%; object-fit: cover;
+  display: block;
+}
+.gallery-item .overlay {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  padding: 40px 12px 10px;
+  background: linear-gradient(transparent, rgba(0,0,0,0.8));
+  font-size: 11px; color: rgba(255,255,255,0.7);
+}
+.gallery-empty {
+  grid-column: 1 / -1;
+  display: flex; flex-direction: column; align-items: center;
+  padding: 60px 20px;
+}
+
+/* ===== Responsive ===== */
+@media (max-width: 640px) {
+  .navbar { padding: 0 16px; }
+  .nav-links a:not(.nav-cta) { display: none; }
+  .generator-container { padding: 24px 16px; }
+  .hero-showcase .card { width: 160px; }
+  .section { padding: 60px 16px; }
+}
+</style>
+</head>
+<body>
+
+<!-- Navbar -->
+<nav class="navbar">
+  <div><span class="logo">Pixar Clay Studio</span><span class="logo-sub">AI</span></div>
+  <div class="nav-links">
+    <a href="#features">功能</a>
+    <a href="#how">流程</a>
+    <a href="#generator-section">开始创作</a>
+    <a href="#generator-section" class="nav-cta">立即体验</a>
+  </div>
+</nav>
+
+<!-- Hero -->
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-badge">✨ Powered by LiblibAI SDXL</div>
+  <h1>把照片变成<br><span class="highlight">皮克斯黏土人偶</span></h1>
+  <p>上传一张照片，AI 自动转化为 3D 皮克斯黏土风格人偶。<br>保留原图构图、姿态、配色，每一帧都是亲手捏塑的艺术品。</p>
+  <div class="hero-actions">
+    <a href="#generator-section" class="btn-primary">🎨 开始创作</a>
+    <a href="#features" class="btn-secondary">了解更多 →</a>
+  </div>
+  <div class="hero-showcase">
+    <div class="card"><div class="icon">🎭</div><div class="label">人脸锁定</div><div class="desc">上传正脸照提升相似度</div></div>
+    <div class="card"><div class="icon">🦴</div><div class="label">姿态骨架</div><div class="desc">MediaPipe 精确锁定肢体</div></div>
+    <div class="card"><div class="icon">🎨</div><div class="label">多种风格</div><div class="desc">黏土 · Q版 · 手办</div></div>
+    <div class="card"><div class="icon">⚡</div><div class="label">30秒出图</div><div class="desc">云端 SDXL 极速渲染</div></div>
+  </div>
+</section>
+
+<!-- Features -->
+<section class="section" id="features">
+  <div class="section-header">
+    <h2>为什么选择 Pixar Clay Studio</h2>
+    <p>专为黏土风格优化的 AI 管线，从材质到光影逐层控制</p>
+  </div>
+  <div class="features-grid">
+    <div class="feature-card">
+      <div class="icon">🧱</div>
+      <h3>黏土材质引擎</h3>
+      <p>5 款 SDXL 黏土 LoRA 联动，皮肤、衣物、发丝全部转化为细腻泥塑肌理，拒绝半写实半黏土的割裂感。</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">🎯</div>
+      <h3>ControlNet 精确控制</h3>
+      <p>Canny 边缘检测锁定肢体轮廓，姿态骨架确保构图与原图严格对齐，多人合影也不会错位。</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">👤</div>
+      <h3>人脸参考可选</h3>
+      <p>上传一张正面人脸照，AI 会参考五官特征生成黏土人偶，解决通用人偶脸辨识度不足的痛点。</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">🎨</div>
+      <h3>多风格切换</h3>
+      <p>默认皮克斯黏土、Q 版黏土人偶、硬质手办三种风格一键切换，适配不同场景需求。</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">⚙️</div>
+      <h3>精细参数调节</h3>
+      <p>画面还原度滑条、强力黏土模式、反向屏蔽词自定义，给进阶用户充分的创作自由。</p>
+    </div>
+    <div class="feature-card">
+      <div class="icon">☁️</div>
+      <h3>云端渲染</h3>
+      <p>基于 LiblibAI SDXL 算力集群，无需本地显卡，浏览器上传即可生成，30-60 秒出图。</p>
+    </div>
+  </div>
+</section>
+
+<!-- How it works -->
+<section class="section" id="how">
+  <div class="section-header">
+    <h2>三步完成创作</h2>
+    <p>无需任何设计经验，上传照片即可开始</p>
+  </div>
+  <div class="steps">
+    <div class="step">
+      <h3>上传参考图</h3>
+      <p>选择一张你想要转化的人像或场景照片，支持拖动或点击上传</p>
+    </div>
+    <div class="step">
+      <h3>调整参数</h3>
+      <p>选择风格模式、调节还原度、开启姿态锁定或人脸参考，定制你的专属效果</p>
+    </div>
+    <div class="step">
+      <h3>一键生成</h3>
+      <p>点击生成，等待 30-60 秒即可下载皮克斯黏土风格的艺术作品</p>
+    </div>
+  </div>
+</section>
+
+<!-- Showcase / Gallery -->
+<section class="section" id="showcase" style="padding-bottom:40px;">
+  <div class="section-header">
+    <h2>🎬 作品展示</h2>
+    <p>最新生成的黏土人偶作品</p>
+  </div>
+  <div class="gallery-grid" id="galleryGrid">
+    <div class="gallery-empty" id="galleryEmpty">
+      <div style="font-size:48px;margin-bottom:16px;opacity:0.3;">🎨</div>
+      <p style="color:#71717a;text-align:center;">还没有作品，快来创作第一张吧！</p>
+    </div>
+  </div>
+</section>
+
+<!-- Generator App -->
+<section class="section" id="generator-section">
+  <div class="generator-container">
+    <h2 class="section-header" style="margin-bottom:8px;">🎨 开始创作</h2>
+    <div class="subtitle">上传图片，AI 自动转为皮克斯黏土人偶风格</div>
+
+    <!-- Main image upload -->
+    <div class="upload-area" id="uploadArea">
+      <div id="uploadPlaceholder">
+        <div class="upload-icon">🖼️</div>
+        <div class="upload-text">点击或拖拽上传 <strong>参考图</strong></div>
+        <div style="font-size:12px;margin-top:4px;color:#71717a;">支持 JPG / PNG / WebP</div>
+      </div>
+      <img id="preview" style="display:none;" alt="preview">
+    </div>
+    <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp">
+
+    <!-- Face reference upload -->
+    <div class="upload-area" id="faceUploadArea" style="margin-top:0;min-height:72px;padding:18px 16px;border-style:dashed;border-color:rgba(255,255,255,0.06);background:rgba(255,255,255,0.01);">
+      <div id="facePlaceholder">
+        <div class="upload-icon" style="font-size:18px;">👤</div>
+        <div class="upload-text" style="font-size:13px;">可选：上传<strong>正面人脸照</strong>，提升人物五官相似度</div>
+      </div>
+      <img id="facePreview" style="display:none;max-height:80px;border-radius:8px;" alt="face ref">
+    </div>
+    <input type="file" id="faceFileInput" accept="image/png,image/jpeg,image/webp" style="display:none;">
+
+    <!-- Prompt -->
+    <div class="form-group">
+      <label for="promptInput">描述词（Prompt）</label>
+      <textarea id="promptInput" placeholder="例如：3D 皮克斯黏土卡通风格，柔和漫射光影，黏土材质细腻"></textarea>
+    </div>
+
+    <!-- Style mode -->
+    <div class="form-group">
+      <label for="modeSelect">风格模式</label>
+      <select id="modeSelect">
+        <option value="clay">皮克斯黏土（默认）— Clay Word</option>
+        <option value="qclay">Q版黏土人偶 — Qclay_XL_V2.0</option>
+        <option value="carton">手办 — SDXL 卡通 3D 形象</option>
+      </select>
+    </div>
+
+    <!-- Denoising slider -->
+    <div class="slider-group">
+      <label>画面还原度 <span style="font-weight:400;color:#71717a;font-size:12px;">（数值越小越还原原图）</span></label>
+      <div class="slider-row">
+        <span style="font-size:12px;color:#71717a;">保守</span>
+        <input type="range" id="strengthSlider" min="0.2" max="0.7" step="0.01" value="0.47">
+        <span style="font-size:12px;color:#71717a;">自由</span>
+        <span class="val-badge" id="strengthVal">0.47</span>
+      </div>
+      <div class="slider-hint">
+        默认 0.47（均衡）· 单人 0.47~0.48 · 多人 0.46~0.48
+      </div>
+    </div>
+
+    <!-- Checkboxes -->
+    <div class="checkbox-row">
+      <label><input type="checkbox" id="styleStrengthCheck">强力黏土 <span>降低还原度增强质感</span></label>
+      <label><input type="checkbox" id="bgEnhanceCheck">背景浮雕 <span>强化背景立体感</span></label>
+      <label><input type="checkbox" id="poseCheck" checked>姿态骨架 <span>MediaPipe 锁定肢体</span></label>
+      <label><input type="checkbox" id="faceidCheck">人脸锁定 <span>保留五官特征</span></label>
+    </div>
+
+    <!-- Negative prompt -->
+    <div class="form-group">
+      <label for="negPrompt">反向屏蔽词（Negative Prompt）</label>
+      <input type="text" id="negPrompt"
+             placeholder="多余人物、新增人物、位置偏移、背景重构、畸形五官、画面变形、手指粘连"
+             value="多余人物、新增人物、人物位置偏移、背景重构、畸形五官、画面变形、手指粘连、多根手指、缺失手指、扭曲手掌">
+    </div>
+
+    <!-- Generate -->
+    <button class="btn-generate" id="generateBtn">🎨 生成黏土人偶</button>
+
+    <!-- Status -->
+    <div id="status"></div>
+
+    <!-- Result -->
+    <div id="result">
+      <img id="resultImg" alt="生成结果">
+      <div class="info" id="resultInfo"></div>
+    </div>
+  </div>
+</section>
+
+<!-- Footer -->
+<footer class="footer">
+  <p>Pixar Clay Studio · 基于 LiblibAI SDXL 构建 · <a href="https://www.liblib.art" target="_blank">LiblibAI</a></p>
+  <p style="margin-top:4px;font-size:12px;">© 2026 · 仅供学习交流</p>
+</footer>
+
+<script>
+// ========== DOM refs ==========
+const slider     = document.getElementById("strengthSlider");
+const valText    = document.getElementById("strengthVal");
+const fileInput  = document.getElementById("fileInput");
+const uploadArea = document.getElementById("uploadArea");
+const preview    = document.getElementById("preview");
+const placeholder= document.getElementById("uploadPlaceholder");
+const generateBtn = document.getElementById("generateBtn");
+let isLoading = false;
+const resultEl   = document.getElementById("result");
+const resultImg  = document.getElementById("resultImg");
+const resultInfo = document.getElementById("resultInfo");
+const statusEl   = document.getElementById("status");
+
+// ========== 工具函数 ==========
+function setStatus(msg, type) {
+  statusEl.textContent = msg;
+  statusEl.className = type || "loading";
+}
+function setLoading(loading, label) {
+  isLoading = loading;
+  generateBtn.disabled = loading;
+  generateBtn.innerText = label || "🎨 生成黏土人偶";
+}
+
+// ========== 滑块 ==========
+slider.oninput = () => { valText.innerText = slider.value; };
+
+// ========== 图片上传 ==========
+uploadArea.addEventListener("click", () => fileInput.click());
+uploadArea.addEventListener("dragover", e => { e.preventDefault(); uploadArea.classList.add("dragover"); });
+uploadArea.addEventListener("dragleave", () => { uploadArea.classList.remove("dragover"); });
+uploadArea.addEventListener("drop", e => {
+  e.preventDefault(); uploadArea.classList.remove("dragover");
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith("image/")) handleFile(file);
+});
+fileInput.addEventListener("change", () => { if (fileInput.files[0]) handleFile(fileInput.files[0]); });
+
+let uploadedBase64 = "";
+let faceBase64 = "";
+
+function handleFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    uploadedBase64 = e.target.result;
+    preview.src = uploadedBase64;
+    preview.style.display = "block";
+    placeholder.style.display = "none";
+  };
+  reader.readAsDataURL(file);
+}
+
+// 人脸参考图
+const faceUploadArea = document.getElementById("faceUploadArea");
+const faceFileInput = document.getElementById("faceFileInput");
+const facePreview = document.getElementById("facePreview");
+const facePlaceholder = document.getElementById("facePlaceholder");
+
+faceUploadArea.addEventListener("click", () => faceFileInput.click());
+faceUploadArea.addEventListener("dragover", e => { e.preventDefault(); faceUploadArea.classList.add("dragover"); });
+faceUploadArea.addEventListener("dragleave", () => { faceUploadArea.classList.remove("dragover"); });
+faceUploadArea.addEventListener("drop", e => {
+  e.preventDefault(); faceUploadArea.classList.remove("dragover");
+  const file = e.dataTransfer.files[0];
+  if (file && file.type.startsWith("image/")) handleFaceFile(file);
+});
+faceFileInput.addEventListener("change", () => { if (faceFileInput.files[0]) handleFaceFile(faceFileInput.files[0]); });
+
+function handleFaceFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    faceBase64 = e.target.result;
+    facePreview.src = faceBase64;
+    facePreview.style.display = "block";
+    facePlaceholder.style.display = "none";
+  };
+  reader.readAsDataURL(file);
+}
+
+// ========== 生成 ==========
+generateBtn.addEventListener("click", async () => {
+  if (isLoading) return;
+  const selectedFile = fileInput.files?.[0];
+  if (!selectedFile) return alert("请先上传参考图片");
+
+  const userPrompt = document.getElementById("promptInput").value.trim();
+  if (!userPrompt) return alert("请输入描述词");
+
+  setLoading(true, "处理中...");
+  setStatus("正在上传参考图片...", "loading");
+
+  const strength = Number(slider.value);
+  const negativePrompt = document.getElementById("negPrompt").value.trim();
+
+  const body = {
+    prompt: userPrompt,
+    image: uploadedBase64,
+    strength,
+    negative_prompt: negativePrompt,
+    mode: document.getElementById("modeSelect").value,
+    background_enhance: document.getElementById("bgEnhanceCheck").checked,
+    pose_preprocess: document.getElementById("poseCheck").checked,
+    enable_faceid: document.getElementById("faceidCheck").checked,
+    face_image: faceBase64 || undefined,
+  };
+  if (document.getElementById("styleStrengthCheck").checked) {
+    body.style_strength = 0.39;
+  }
+
+  try {
+    const baseUrl = (location.protocol === "file:") ? "http://127.0.0.1:3001" : "";
+
+    const submitResp = await fetch(baseUrl + "/api/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const submitJson = await submitResp.json();
+    if (!submitResp.ok) {
+      setStatus("生成失败: " + (submitJson.error || "未知错误"), "error");
+      setLoading(false, "🎨 生成黏土人偶");
+      return;
+    }
+    if (!submitJson.taskId) {
+      setStatus("返回数据缺少 taskId", "error");
+      setLoading(false, "🎨 生成黏土人偶");
+      return;
+    }
+
+    const taskId = submitJson.taskId;
+    setStatus("任务已提交，等待生成...", "");
+
+    let pollCount = 0;
+    const maxPolls = 120;
+    while (pollCount < maxPolls) {
+      await new Promise(r => setTimeout(r, 2000));
+      pollCount++;
+      const resultResp = await fetch(baseUrl + "/api/result/" + taskId);
+      const resultJson = await resultResp.json();
+
+      if (resultJson.status === "done") {
+        resultImg.src = baseUrl + "/api/image/" + taskId;
+        resultEl.classList.add("show");
+        const cost = resultJson.meta?.pointsCost;
+        const bal = resultJson.meta?.accountBalance;
+        resultInfo.textContent = `消耗积分: ${cost ?? "?"} | 剩余积分: ${bal ?? "?"}`;
+        setStatus("生成成功!", "success");
+        setLoading(false, "🎨 生成黏土人偶");
+        return;
+      }
+      if (resultJson.status === "error") {
+        setStatus("生成失败: " + (resultJson.error || "未知错误"), "error");
+        setLoading(false, "🎨 生成黏土人偶");
+        return;
+      }
+      if (pollCount % 10 === 0) {
+        setStatus("生成中，请稍候... (" + (pollCount * 2) + "s)", "");
+      }
+    }
+    setStatus("生成超时，请重试", "error");
+  } catch (err) {
+    setStatus("网络请求失败，请检查服务是否启动", "error");
+  } finally {
+    setLoading(false, "🎨 生成黏土人偶");
+  }
+});
+
+// ========== Gallery 作品展示 ==========
+(async function loadGallery() {
+  const galleryGrid = document.getElementById("galleryGrid");
+  const galleryEmpty = document.getElementById("galleryEmpty");
+  try {
+    const baseUrl = (location.protocol === "file:") ? "http://127.0.0.1:3001" : "";
+    const resp = await fetch(baseUrl + "/api/gallery");
+    if (!resp.ok) throw new Error("HTTP " + resp.status);
+    const items = await resp.json();
+    if (!items || items.length === 0) return;
+
+    galleryEmpty.style.display = "none";
+    items.forEach(item => {
+      const div = document.createElement("div");
+      div.className = "gallery-item";
+      div.innerHTML = '<img src="' + baseUrl + item.imageUrl + '" alt="生成作品" loading="lazy">' +
+        '<div class="overlay">' +
+          (item.prompt ? item.prompt.slice(0, 30) + (item.prompt.length > 30 ? "…" : "") : "") +
+          ' · ' + new Date(item.createdAt).toLocaleDateString("zh-CN") +
+        '</div>';
+      galleryGrid.appendChild(div);
+    });
+  } catch (e) {
+    console.warn("Gallery 加载失败:", e.message);
+  }
+})();
+</script>
+</body>
+</html>
