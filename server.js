@@ -17,6 +17,17 @@ const path = require("path");
 const https = require("https");
 const fs = require("fs");
 const { preprocessImage } = require("./pose-preprocess");
+const axios = require("axios");
+
+// ==============================
+// AI 后端选择：liblib（默认）| sdwebui
+// ==============================
+const AI_BACKEND = process.env.AI_BACKEND || "liblib";
+const SD_WEBUI_URL = process.env.SD_WEBUI_URL || "http://localhost:7860";
+console.log(`[配置] AI 后端: ${AI_BACKEND}${AI_BACKEND === "sdwebui" ? ` → ${SD_WEBUI_URL}` : ""}`);
+
+// SD WebUI 图片保存目录
+const OUTPUT_DIR = path.join(__dirname, "output");
 
 // ==============================
 // Gallery 存储（JSON 文件）
@@ -64,20 +75,23 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(__dirname, ".")));
 
 // ==============================
-// LiblibAI 配置
+// LiblibAI 配置（仅 liblib 后端需要）
 // ==============================
-const LIBLIBAI_ACCESS_KEY = process.env.LIBLIBAI_ACCESS_KEY;
-const LIBLIBAI_SECRET_KEY = process.env.LIBLIBAI_SECRET_KEY;
-if (!LIBLIBAI_ACCESS_KEY || !LIBLIBAI_SECRET_KEY) {
-  console.error("错误: 请在 .env 中配置 LIBLIBAI_ACCESS_KEY 和 LIBLIBAI_SECRET_KEY");
-  process.exit(1);
-}
+let client = null;
+if (AI_BACKEND === "liblib") {
+  const LIBLIBAI_ACCESS_KEY = process.env.LIBLIBAI_ACCESS_KEY;
+  const LIBLIBAI_SECRET_KEY = process.env.LIBLIBAI_SECRET_KEY;
+  if (!LIBLIBAI_ACCESS_KEY || !LIBLIBAI_SECRET_KEY) {
+    console.error("错误: 请在 .env 中配置 LIBLIBAI_ACCESS_KEY 和 LIBLIBAI_SECRET_KEY");
+    process.exit(1);
+  }
 
-const { LiblibAI } = require("liblibai");
-const client = new LiblibAI({
-  apiKey: LIBLIBAI_ACCESS_KEY,
-  apiSecret: LIBLIBAI_SECRET_KEY,
-});
+  const { LiblibAI } = require("liblibai");
+  client = new LiblibAI({
+    apiKey: LIBLIBAI_ACCESS_KEY,
+    apiSecret: LIBLIBAI_SECRET_KEY,
+  });
+}
 
 // img2img 参数模板 — 必须支持图生图的模板
 const IMG2IMG_TEMPLATE_UUID = "9c7d531dc75f476aa833b3d452b8f7ad";
@@ -254,12 +268,21 @@ app.post("/api/generate", (req, res) => {
   res.json({ taskId });
 
   // 后台执行生成（不阻塞响应）
-  runGenerate(taskId, {
-    image, userStyle, strength, style_strength,
-    negative_prompt, width, height, mode,
-    background_enhance, pose_preprocess,
-    enable_faceid, face_image,
-  });
+  if (AI_BACKEND === "sdwebui") {
+    runGenerateSDWebUI(taskId, {
+      image, userStyle, strength, style_strength,
+      negative_prompt, width, height, mode,
+      background_enhance, pose_preprocess,
+      enable_faceid, face_image,
+    });
+  } else {
+    runGenerate(taskId, {
+      image, userStyle, strength, style_strength,
+      negative_prompt, width, height, mode,
+      background_enhance, pose_preprocess,
+      enable_faceid, face_image,
+    });
+  }
 });
 
 // ==============================
@@ -288,6 +311,21 @@ app.get("/api/image/:taskId", async (req, res) => {
     return res.status(404).json({ error: "图片不存在" });
   }
   try {
+    // SD WebUI: 本地文件
+    if (task.result.imageUrl.startsWith("/") || task.result.imageUrl.startsWith(OUTPUT_DIR)) {
+      if (!fs.existsSync(task.result.imageUrl)) {
+        return res.status(404).json({ error: "图片文件不存在" });
+      }
+      const stat = fs.statSync(task.result.imageUrl);
+      res.setHeader("Content-Type", "image/png");
+      res.setHeader("Content-Length", stat.size);
+      const stream = fs.createReadStream(task.result.imageUrl);
+      stream.pipe(res);
+      console.log(`[图片代理] 本地文件 (${(stat.size / 1024).toFixed(0)}KB)`);
+      return;
+    }
+
+    // LiblibAI CDN: 远程代理
     const imgResp = await fetch(task.result.imageUrl);
     if (!imgResp.ok) {
       return res.status(502).json({ error: "图片下载失败" });
@@ -525,10 +563,191 @@ async function runGenerate(taskId, params) {
 }
 
 // ==============================
+// SD WebUI 配置（仅 sdwebui 后端使用）
+// ==============================
+const SD_WEBUI_LORA_CLAY = process.env.SD_WEBUI_LORA_CLAY || "Clay_Word_XL.safetensors";
+const SD_WEBUI_LORA_CLAY_W = parseFloat(process.env.SD_WEBUI_LORA_CLAY_WEIGHT || "0.7");
+const SD_WEBUI_LORA_HAND = process.env.SD_WEBUI_LORA_HAND || "Perfect_Hands_XL_v3.safetensors";
+const SD_WEBUI_LORA_HAND_W = parseFloat(process.env.SD_WEBUI_LORA_HAND_WEIGHT || "0.6");
+const SD_WEBUI_ADETAILER = process.env.SD_WEBUI_ADETAILER !== "false";
+
+// ==============================
+// SD WebUI 后台生成函数
+// ==============================
+async function runGenerateSDWebUI(taskId, params) {
+  const { image, userStyle, strength, style_strength, negative_prompt, width, height, mode, background_enhance, pose_preprocess, enable_faceid, face_image } = params;
+
+  const task = taskStore.get(taskId);
+  task.status = "processing";
+
+  // 同 Liblib 模式：选择 LoRA 和构建 prompt
+  const mainLoraKey = (mode === "qclay") ? "qclay"
+    : (mode === "carton") ? "carton"
+    : "clay";
+  const mainLora = LORA_DB[mainLoraKey];
+  const enableBgEnhance = background_enhance === true || background_enhance === "true";
+  const activeLoras = [mainLora];
+  if (enableBgEnhance) activeLoras.push(LORA_DB.food);
+
+  const triggerWords = activeLoras.map(l => l.trigger).filter(t => t).join(",");
+  const fullPrompt = triggerWords
+    ? `${CONSTRAINT_TEMPLATE}${triggerWords},${userStyle}`
+    : `${CONSTRAINT_TEMPLATE}${userStyle}`;
+
+  // SD WebUI: LoRA 用 <lora:filename:weight> 嵌入 prompt
+  const loraPrompt = `${fullPrompt}, <lora:${SD_WEBUI_LORA_CLAY}:${SD_WEBUI_LORA_CLAY_W}>, <lora:${SD_WEBUI_LORA_HAND}:${SD_WEBUI_LORA_HAND_W}>`;
+
+  const isPortrait = /证件照|肖像|portrait|headshot|单人/.test(userStyle);
+  const isMultiPerson = /多人|跑步|家庭|walking|running|family|group|two|three|four|people|每个人都|四人/.test(userStyle);
+  const baseStrength = strength ?? (isPortrait ? 0.47 : isMultiPerson ? 0.43 : 0.47);
+  const effectiveStrength = style_strength ?? baseStrength;
+
+  // SD WebUI negative prompt（复用 Liblib 的同款）
+  const negPrompt = negative_prompt ||
+    "face tampered, identity lost, facial features changed or replaced, " +
+    "body proportion distortion, limb length wrong, " +
+    "fingers stuck together or fused, deformed hands, missing fingers, extra fingers, " +
+    "扭曲手指, 手指粘连, 多根手指, 缺失手指, 扭曲手掌, 畸形手部, 模糊指尖, 手部重叠, " +
+    "手部结构扭曲, 手掌畸形, 手指弯曲异常, 手指交叉融合, 手部轮廓缺失, 手指关节错位, 手指粗细不均, " +
+    "腿部扭曲, 小腿畸形, 脚掌变形, 鞋子融化, 腿脚融合, 脚部结构错乱, 脚趾粘连缺失, 下肢截断, " +
+    "legs twisted, feet deformed, shoes melted or fused, foot structure混乱, missing toes, " +
+    "extra buttons, added clothing decorations,凭空新增纽扣, " +
+    "large scale background reconstruction, original background objects deleted, " +
+    "真实皮肤, real human skin texture remaining, realistic skin pores, " +
+    "原生发丝, realistic hair strands, normal fabric texture, cloth weave remaining, " +
+    "针织布料质感, 写实照片高光, knit texture, fabric weave, " +
+    "real skin, human hair, fabric luster, wet sheen, oil shine, metallic gloss, " +
+    "perspective distortion, multi-person position shifted, " +
+    "photorealistic, realistic texture, real photo, " +
+    "deformed face, bad anatomy, distorted eyes, ugly, extra limbs, " +
+    "cloned face, extra people, missing arms or legs, " +
+    "glossy plastic, smooth plastic, glossy surface, wax figure, " +
+    "outline ghosting, transparent contour residue, edge lines, " +
+    "object shape altered, flat background, flat hand-drawn background, paper texture, " +
+    "clothing color or pattern changed, " +
+    "gender changed, age changed, face replaced, identity swapped, " +
+    "facial expression wrong, emotion mismatch, " +
+    "wrong hairstyle, clothing style changed, " +
+    "noise, blurry, oversaturated, low quality";
+
+  await waitForTurn();
+  try {
+    console.log(`[${taskId}] [1/3] 准备图片...`);
+
+    // 提取 base64 数据（去掉 data:image/... 前缀）
+    const rawBase64 = image.replace(/^data:image\/\w+;base64,/, "");
+
+    // 构建 img2img 请求体
+    const payload = {
+      init_images: [rawBase64],
+      prompt: loraPrompt,
+      negative_prompt: negPrompt,
+      steps: 28,
+      sampler_name: "DPM++ 2M Karras",
+      cfg_scale: 7,
+      width: width || 768,
+      height: height || 1024,
+      denoising_strength: effectiveStrength,
+      seed: -1,
+      batch_size: 1,
+      restore_faces: true,
+    };
+
+    // ControlNet（用 Canny 锁定轮廓）
+    const controlNetUnits = [];
+    controlNetUnits.push({
+      input_image: rawBase64,
+      module: "canny",
+      model: "control_v11p_sd15_canny [d14c016b]",
+      weight: 0.7,
+      resize_mode: 1,
+      control_mode: 1,
+      pixel_perfect: true,
+      processor_res: 1024,
+      threshold_a: 200,
+      threshold_b: 300,
+      guidance_start: 0,
+      guidance_end: 0.75,
+    });
+    payload.alwayson_scripts = {
+      controlnet: { args: controlNetUnits },
+    };
+
+    // ADetailer 手部修复（自动检测手部区域局部重绘）
+    if (SD_WEBUI_ADETAILER) {
+      payload.alwayson_scripts.ADetailer = {
+        args: [
+          true,                                  // 启用
+          "hand_yolov8n.pt",                      // 模型
+          0.5,                                    // 检测置信度阈值
+          0.3,                                    // 蒙版膨胀
+          "perfect hands, clear knuckles, five complete fingers, natural palm perspective, clay doll hands",  // 正向 prompt
+          "deformed fingers, fused fingers, missing fingers, blurry knuckles",  // 反向 prompt
+        ],
+      };
+    }
+
+    console.log(`[${taskId}] [2/3] 发送到 SD WebUI: ${SD_WEBUI_URL}/sdapi/v1/img2img`);
+
+    const resp = await axios.post(`${SD_WEBUI_URL}/sdapi/v1/img2img`, payload, {
+      timeout: 120000,  // 2分钟超时
+    });
+
+    const images = resp.data.images;
+    if (!images || images.length === 0) {
+      throw new Error("SD WebUI 未返回图片");
+    }
+
+    const resultBase64 = images[0];
+    const imgBuffer = Buffer.from(resultBase64, "base64");
+    const outputPath = path.join(OUTPUT_DIR, `${taskId}.png`);
+    fs.writeFileSync(outputPath, imgBuffer);
+
+    console.log(`[${taskId}] [3/3] 生成完成! (${(imgBuffer.length / 1024).toFixed(0)}KB)`);
+
+    task.status = "done";
+    task.result = {
+      imageUrl: outputPath,   // 本地文件路径
+      meta: { backend: "sdwebui", size: imgBuffer.length },
+    };
+
+    // 保存到 Gallery
+    try {
+      addGalleryRecord({
+        id: taskId,
+        taskId,
+        prompt: params.userStyle?.slice(0, 80) || "",
+        mode: params.mode || "clay",
+        strength: params.strength || 0.47,
+        hasFaceRef: !!(params.face_image && params.face_image.length > 100),
+        pointsCost: 0,
+        createdAt: Date.now(),
+      });
+    } catch (gErr) {
+      console.warn(`[${taskId}] Gallery 保存失败: ${gErr.message}`);
+    }
+  } catch (err) {
+    const errMsg = err.response?.data?.detail || err.response?.data?.message || err.message;
+    console.error(`[${taskId}] SD WebUI 异常:`, errMsg);
+    task.status = "error";
+    task.error = typeof errMsg === "string" ? errMsg : JSON.stringify(errMsg);
+  } finally {
+    releaseTurn();
+  }
+}
+
+// ==============================
 // 配置查看接口
 // ==============================
 app.get("/api/config", (req, res) => {
   res.json({
+    backend: AI_BACKEND,
+    sdWebuiUrl: AI_BACKEND === "sdwebui" ? SD_WEBUI_URL : undefined,
+    sdWebuiLoras: AI_BACKEND === "sdwebui" ? {
+      clay: `${SD_WEBUI_LORA_CLAY} @ ${SD_WEBUI_LORA_CLAY_W}`,
+      hand: `${SD_WEBUI_LORA_HAND} @ ${SD_WEBUI_LORA_HAND_W}`,
+      adetailer: SD_WEBUI_ADETAILER ? "已启用" : "未启用",
+    } : undefined,
     controlnet: CONTROLNET_MODEL_UUID ? "已启用 (Canny)" : "未启用",
     openpose: OPENPOSE_MODEL_UUID ? `已启用 (${OPENPOSE_MODEL_UUID.slice(0,8)}...)` : "未启用",
     ipAdapter: IPADAPTER_ENABLED ? `已启用 (FaceID Plus V2, ${IPADAPTER_MODEL_UUID.slice(0,8)}...)` : "未启用",

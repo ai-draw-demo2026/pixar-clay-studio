@@ -6,3 +6,4 @@ logs/
 *.key
 start.sh
 ecosystem.config.js
+output/
