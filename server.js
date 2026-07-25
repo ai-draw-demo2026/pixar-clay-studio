@@ -150,8 +150,8 @@ const IDENTITY_FIX =
   "gesture, hand pose, body position, composition, relative spacing between people, " +
   "clothing colors and patterns, ";
 
-// 材质强制转化：每样东西都必须变成黏土玩偶
-const CLAY_MANDATE =
+// 材质强制转化：按模式选择不同风格
+const CLAY_MANDATE_DEFAULT =
   "THIS IS A PIXAR CLAY STOP-MOTION DOLL. Convert entire person into a clay stop-motion puppet. " +
   "Not a real human. 哑光黏土泥塑材质, entire body is matte clay sculpted material. " +
   "皮肤带有细腻黏土肌理，手工捏塑痕迹明显, skin has fine clay sculpting texture with hand-sculpting marks. " +
@@ -166,6 +166,35 @@ const CLAY_MANDATE =
   "画面所有物体统一黏土泥塑材质，全部元素拥有黏土肌理，禁止局部写实摄影质感, " +
   "unified clay sculpt material across entire image, every element has clay texture, no局部 realistic patches, ";
 
+const CLAY_MANDATE_QCLAY =
+  "THIS IS A Q版 CHIBI CLAY FIGURE,超萌Q版黏土人偶. " +
+  "Q版三头身比例, chibi proportion with oversized cute head and small body. " +
+  "哑光黏土材质, matte clay material with smooth cute texture. " +
+  "整体圆润可爱, overall round and adorable chibi style. " +
+  "Q版黏土玩偶风格, Q-version clay doll style with big bright eyes. " +
+  "手工捏塑痕迹, hand-sculpted clay texture. " +
+  "柔和布光, soft cute lighting. " +
+  "人物保持原图五官特征和服饰配色, preserve original facial features and clothing colors. " +
+  "物体边缘圆润, all edges rounded. background = clay diorama. " +
+  "统一黏土材质, unified clay material across entire image, ";
+
+const CLAY_MANDATE_CARTON =
+  "THIS IS A 3D CARTON FIGURE STATUE, 3D手办人偶. " +
+  "Convert person into a collectible figure statue. " +
+  "硬质手办材质, rigid PVC figure material with slight gloss. " +
+  "模型涂装质感, model kit painted finish with precise edge details. " +
+  "手办特有的轻微光泽感, subtle figure collectible sheen, not matte clay. " +
+  "精雕细节, finely sculpted details with sharp edges. " +
+  "人物保持原图五官特征、手势、服饰配色, preserve original facial features, gestures, clothing colors. " +
+  "背景为手办展示风格, figure display diorama background. " +
+  "统一手办材质, unified figure collectible material across entire image, ";
+
+function getStyleMandate(mode) {
+  if (mode === "qclay") return CLAY_MANDATE_QCLAY;
+  if (mode === "carton") return CLAY_MANDATE_CARTON;
+  return CLAY_MANDATE_DEFAULT;
+}
+
 // 约束后缀
 const CONSTRAINT_SUFFIX =
   "no real human skin texture, no real hair strands, no fabric weave remaining, " +
@@ -174,7 +203,15 @@ const CONSTRAINT_SUFFIX =
   "no realistic skin pores, no glossy highlights, no photographic lighting, " +
   "no fabric luster, no wet sheen, no metallic gloss, ";
 
-const CONSTRAINT_TEMPLATE = IDENTITY_FIX + CLAY_MANDATE + CONSTRAINT_SUFFIX;
+function buildPrompt(mode, userStyle) {
+  const mandate = getStyleMandate(mode);
+  const loraInfo = LORA_DB[mode === "qclay" ? "qclay" : mode === "carton" ? "carton" : "clay"];
+  const triggerWords = loraInfo?.trigger || "";
+  const base = `${IDENTITY_FIX}${mandate}${CONSTRAINT_SUFFIX}`;
+  return triggerWords
+    ? `${base}${triggerWords},${userStyle}`
+    : `${base}${userStyle}`;
+}
 
 // ==============================
 // 工具：上传 base64 图片到 LiblibAI OSS
@@ -361,10 +398,7 @@ async function runGenerate(taskId, params) {
   if (enableBgEnhance) activeLoras.push(LORA_DB.food);
 
   const additionalNetwork = activeLoras.map(l => ({ modelId: l.uuid, weight: l.weights.normal }));
-  const triggerWords = activeLoras.map(l => l.trigger).filter(t => t).join(",");
-  const fullPrompt = triggerWords
-    ? `${CONSTRAINT_TEMPLATE}${triggerWords},${userStyle}`
-    : `${CONSTRAINT_TEMPLATE}${userStyle}`;
+  const fullPrompt = buildPrompt(mode, userStyle);
 
   await waitForTurn();
   try {
@@ -590,9 +624,7 @@ async function runGenerateSDWebUI(taskId, params) {
   if (enableBgEnhance) activeLoras.push(LORA_DB.food);
 
   const triggerWords = activeLoras.map(l => l.trigger).filter(t => t).join(",");
-  const fullPrompt = triggerWords
-    ? `${CONSTRAINT_TEMPLATE}${triggerWords},${userStyle}`
-    : `${CONSTRAINT_TEMPLATE}${userStyle}`;
+  const fullPrompt = buildPrompt(mode, userStyle);
 
   // SD WebUI: LoRA 用 <lora:filename:weight> 嵌入 prompt
   const loraPrompt = `${fullPrompt}, <lora:${SD_WEBUI_LORA_CLAY}:${SD_WEBUI_LORA_CLAY_W}>, <lora:${SD_WEBUI_LORA_HAND}:${SD_WEBUI_LORA_HAND_W}>`;
