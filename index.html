@@ -634,14 +634,14 @@ generateBtn.addEventListener("click", async () => {
   }
 
   try {
-    const BACKEND_URL = "https://seventh-toe-rail-legitimate.trycloudflare.com";
+    const BACKEND_URL = "https://loose-wings-lead.loca.lt";
 
     const baseUrl = (location.hostname === "127.0.0.1" || location.hostname === "localhost")
       ? "" : BACKEND_URL;
 
     const submitResp = await fetch(baseUrl + "/api/generate", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "bypass-tunnel-reminder": "1" },
       body: JSON.stringify(body),
     });
     const submitJson = await submitResp.json();
@@ -708,7 +708,7 @@ generateBtn.addEventListener("click", async () => {
   const galleryGrid = document.getElementById("galleryGrid");
   const galleryEmpty = document.getElementById("galleryEmpty");
   try {
-    const BACKEND_URL = "https://seventh-toe-rail-legitimate.trycloudflare.com";
+    const BACKEND_URL = "https://loose-wings-lead.loca.lt";
 
     const baseUrl = (location.hostname === "127.0.0.1" || location.hostname === "localhost")
       ? "" : BACKEND_URL;
