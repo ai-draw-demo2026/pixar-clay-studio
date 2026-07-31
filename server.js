@@ -686,18 +686,19 @@ async function runGenerateSDWebUI(taskId, params) {
     };
 
     // ControlNet（用 Canny 锁定轮廓）
+    // 必须用 SDXL 版 Canny：底模和 LoRA 都是 SDXL，SD1.5 的 control_v11p 不兼容
     const controlNetUnits = [];
     controlNetUnits.push({
       input_image: rawBase64,
       module: "canny",
-      model: "control_v11p_sd15_canny [d14c016b]",
+      model: "xinsir-controlnet-canny-sdxl-1.0",
       weight: 0.7,
       resize_mode: 1,
       control_mode: 1,
       pixel_perfect: true,
       processor_res: 1024,
-      threshold_a: 200,
-      threshold_b: 300,
+      threshold_a: 100,
+      threshold_b: 200,
       guidance_start: 0,
       guidance_end: 0.75,
     });
